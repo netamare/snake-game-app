@@ -25,6 +25,8 @@ function App() {
   const [highScore, setHighScore] = useState(() => Number(localStorage.getItem('snake-high-score')) || 0);
   const [difficulty, setDifficulty] = useState('Medium');
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('snake-theme') !== 'light');
+  const snakeRef = useRef(STARTING_SNAKE);
+  const foodRef = useRef({ x: 15, y: 10 });
   const directionRef = useRef('right');
   const queuedRef = useRef('right');
 
@@ -40,28 +42,29 @@ function App() {
 
   const reset = useCallback((shouldStart = false) => {
     setSnake(STARTING_SNAKE); setFood({ x: 15, y: 10 }); setScore(0);
+    snakeRef.current = STARTING_SNAKE; foodRef.current = { x: 15, y: 10 };
     directionRef.current = 'right'; queuedRef.current = 'right'; setDirection('right');
     setStatus(shouldStart ? 'Playing' : 'Ready');
   }, []);
 
   const tick = useCallback(() => {
-    setSnake((current) => {
-      const nextDirection = queuedRef.current;
-      directionRef.current = nextDirection; setDirection(nextDirection);
-      const move = MOVES[nextDirection];
-      const head = { x: current[0].x + move.x, y: current[0].y + move.y };
-      const eating = head.x === food?.x && head.y === food?.y;
-      const bodyToCheck = eating ? current : current.slice(0, -1);
-      const collided = head.x < 0 || head.x >= BOARD_SIZE || head.y < 0 || head.y >= BOARD_SIZE || bodyToCheck.some((part) => part.x === head.x && part.y === head.y);
-      if (collided) { setStatus('Game over'); return current; }
-      const updated = [head, ...current];
-      if (eating) {
-        setScore((value) => { const next = value + 10; setHighScore((best) => Math.max(best, next)); return next; });
-        setFood(getRandomFood(updated));
-      } else updated.pop();
-      return updated;
-    });
-  }, [food]);
+    const current = snakeRef.current;
+    const nextDirection = queuedRef.current;
+    directionRef.current = nextDirection; setDirection(nextDirection);
+    const move = MOVES[nextDirection];
+    const head = { x: current[0].x + move.x, y: current[0].y + move.y };
+    const eating = head.x === foodRef.current?.x && head.y === foodRef.current?.y;
+    const bodyToCheck = eating ? current : current.slice(0, -1);
+    const collided = head.x < 0 || head.x >= BOARD_SIZE || head.y < 0 || head.y >= BOARD_SIZE || bodyToCheck.some((part) => part.x === head.x && part.y === head.y);
+    if (collided) { setStatus('Game over'); return; }
+    const updated = [head, ...current];
+    if (eating) {
+      const nextScore = score + 10;
+      setScore(nextScore); setHighScore((best) => Math.max(best, nextScore));
+      const nextFood = getRandomFood(updated); foodRef.current = nextFood; setFood(nextFood);
+    } else updated.pop();
+    snakeRef.current = updated; setSnake(updated);
+  }, [score]);
 
   useEffect(() => {
     if (status !== 'Playing') return undefined;
